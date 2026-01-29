@@ -1,0 +1,13 @@
+{
+  "name": "messy-project",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "A sample project with messy documentation for testing DocuMate",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"No tests yet\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
