@@ -45,12 +45,30 @@ export class ExampleValidator {
         true,
       );
 
-      // Check for syntax errors
-      const diagnostics = (sourceFile as unknown as { parseDiagnostics?: { length: number; map: (fn: (d: { messageText: unknown }) => string) => string[] } }).parseDiagnostics;
+      // Check for syntax errors using TypeScript's diagnostic system
+      // parseDiagnostics exists at runtime but isn't in the public type definitions
+      // Use type-safe property access with runtime type checking
+      interface SourceFileWithDiagnostics {
+        parseDiagnostics?: Array<{
+          messageText: string | { messageText: string };
+        }>;
+      }
+
+      const diagnostics = (sourceFile as unknown as SourceFileWithDiagnostics).parseDiagnostics;
+
       if (diagnostics && diagnostics.length > 0) {
+        const errors = diagnostics.map((diagnostic) => {
+          if (typeof diagnostic.messageText === 'string') {
+            return diagnostic.messageText;
+          } else {
+            // messageText can be a DiagnosticMessageChain
+            return diagnostic.messageText.messageText;
+          }
+        });
+
         return {
           isValid: false,
-          error: `Syntax error: ${diagnostics.map((d: { messageText: unknown }) => String(d.messageText)).join(', ')}`,
+          error: `Syntax error: ${errors.join(', ')}`,
         };
       }
 

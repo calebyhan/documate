@@ -9,7 +9,8 @@ export class DocGenerator {
   async generateForFunction(fn: FunctionInfo, code: string, style: string = 'jsdoc'): Promise<string> {
     if (this.copilot) {
       try {
-        const response = await this.copilot.explain(generateDocPrompt(code, style));
+        // Use suggest for generation, not explain
+        const response = await this.copilot.suggest(generateDocPrompt(code, style));
         if (response.success) {
           const extracted = extractCodeBlockFromResponse(response.raw);
           if (extracted && extracted.includes('/**')) return extracted;
