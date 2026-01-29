@@ -39,14 +39,11 @@ export class CopilotWrapper {
       return { ok: false, error: 'GitHub CLI (gh) is not installed. Install it from https://cli.github.com/' };
     }
 
-    // Check copilot extension
+    // Check copilot command is available (either built-in or as extension)
     try {
-      const output = await this.runCommand('gh', ['extension', 'list']);
-      if (!output.includes('copilot')) {
-        return { ok: false, error: 'GitHub Copilot extension not found. Run: gh extension install github/copilot' };
-      }
+      await this.runCommand('gh', ['copilot', '--help']);
     } catch {
-      return { ok: false, error: 'Failed to list gh extensions. Run: gh auth login' };
+      return { ok: false, error: 'GitHub Copilot not available. Ensure you have gh CLI v2.50.0+ or run: gh extension install github/gh-copilot' };
     }
 
     // Check auth
