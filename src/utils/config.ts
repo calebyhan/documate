@@ -9,9 +9,9 @@ const CACHE_DIR = '.documate';
 export const DEFAULT_CONFIG: DocuMateConfig = {
   version: '1.0',
   scan: {
-    include: ['**/*.{ts,tsx,js,jsx}'],
-    exclude: ['**/node_modules/**', '**/dist/**', '**/*.test.ts', '**/*.spec.ts', '**/*.d.ts'],
-    languages: ['typescript', 'javascript'],
+    include: ['**/*.{ts,tsx,js,jsx}', '**/*.py', '*.md', 'docs/**/*.md'],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/*.test.ts', '**/*.spec.ts', '**/*.d.ts', '**/__pycache__/**', '**/*.pyc'],
+    languages: ['typescript', 'javascript', 'python', 'markdown'],
   },
   documentation: {
     style: 'jsdoc',
@@ -20,6 +20,18 @@ export const DEFAULT_CONFIG: DocuMateConfig = {
   drift: {
     maxDriftDays: 30,
     maxDriftScore: 7,
+  },
+  markdown: {
+    docsDirectory: 'docs/',
+    expectedSections: {
+      'README.md': ['Installation', 'Usage', 'API'],
+    },
+    validateLinks: true,
+    validateCodeExamples: true,
+    checkCrossReferences: true,
+  },
+  python: {
+    docstringStyle: 'auto',
   },
 };
 

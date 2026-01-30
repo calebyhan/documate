@@ -1,7 +1,7 @@
-import type { ScanResult, FunctionInfo, DebtIssue } from '../../types/index.js';
+import type { CodeScanResult, FunctionInfo, DebtIssue } from '../../types/index.js';
 
 export class DebtAnalyzer {
-  analyze(scanResults: ScanResult[]): DebtIssue[] {
+  analyze(scanResults: CodeScanResult[]): DebtIssue[] {
     const issues: DebtIssue[] = [];
 
     for (const result of scanResults) {

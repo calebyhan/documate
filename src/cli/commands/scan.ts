@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { resolve } from 'node:path';
-import { TypeScriptScanner } from '../../core/scanners/typescript-scanner.js';
+import { ScannerRegistry } from '../../core/scanners/scanner-registry.js';
 import { findFiles } from '../../utils/file-system.js';
 import { loadConfig, saveScanCache } from '../../utils/config.js';
 import { createProgressBar } from '../ui/components.js';
@@ -33,8 +33,8 @@ export async function scanCommand(path: string, options: { verbose?: boolean; js
     logger.success(`Found ${files.length} files\n`);
   }
 
-  const scanner = new TypeScriptScanner();
-  const supportedFiles = files.filter((f) => scanner.supports(f));
+  const registry = ScannerRegistry.getInstance();
+  const supportedFiles = files.filter((f) => registry.isSupported(f));
 
   if (supportedFiles.length === 0) {
     if (!options.json) {
@@ -50,8 +50,11 @@ export async function scanCommand(path: string, options: { verbose?: boolean; js
     const results: ScanResult[] = [];
     for (let i = 0; i < supportedFiles.length; i++) {
       try {
-        const result = await scanner.scanFile(supportedFiles[i]);
-        results.push(result);
+        const scanner = registry.getScanner(supportedFiles[i]);
+        if (scanner) {
+          const result = await scanner.scanFile(supportedFiles[i]);
+          results.push(result);
+        }
       } catch (err) {
         if (options.verbose) {
           logger.debug(`Failed to parse ${supportedFiles[i]}: ${err}`);
@@ -71,8 +74,11 @@ export async function scanCommand(path: string, options: { verbose?: boolean; js
     const results: ScanResult[] = [];
     for (const file of supportedFiles) {
       try {
-        const result = await scanner.scanFile(file);
-        results.push(result);
+        const scanner = registry.getScanner(file);
+        if (scanner) {
+          const result = await scanner.scanFile(file);
+          results.push(result);
+        }
       } catch (err) {
         // Silently skip failed files in JSON mode
       }
@@ -87,13 +93,16 @@ export async function scanCommand(path: string, options: { verbose?: boolean; js
 export async function runScan(targetPath: string = process.cwd()): Promise<ScanResult[]> {
   const config = await loadConfig();
   const files = await findFiles(config.scan.include, config.scan.exclude, targetPath);
-  const scanner = new TypeScriptScanner();
-  const supportedFiles = files.filter((f) => scanner.supports(f));
+  const registry = ScannerRegistry.getInstance();
+  const supportedFiles = files.filter((f) => registry.isSupported(f));
 
   const results: ScanResult[] = [];
   for (const file of supportedFiles) {
     try {
-      results.push(await scanner.scanFile(file));
+      const scanner = registry.getScanner(file);
+      if (scanner) {
+        results.push(await scanner.scanFile(file));
+      }
     } catch {
       // Skip unparseable files
     }

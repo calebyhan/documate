@@ -5,6 +5,7 @@ import { renderHealthView } from '../ui/views.js';
 import { createSpinner } from '../ui/components.js';
 import { logger, setVerbose } from '../../utils/logger.js';
 import type { ScanResult } from '../../types/index.js';
+import { isCodeResult } from '../../types/index.js';
 
 export async function healthCommand(options: { verbose?: boolean }): Promise<void> {
   if (options.verbose) {
@@ -23,7 +24,8 @@ export async function healthCommand(options: { verbose?: boolean }): Promise<voi
   }
 
   const calculator = new HealthCalculator();
-  const health = calculator.calculateHealth(results);
+  const codeResults = results.filter(isCodeResult);
+  const health = calculator.calculateHealth(codeResults);
 
   renderHealthView(health);
 }

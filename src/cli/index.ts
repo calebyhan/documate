@@ -51,6 +51,7 @@ program
   .description('Generate documentation')
   .argument('<target>', 'File or file:function to document')
   .option('-s, --style <style>', 'Documentation style', 'jsdoc')
+  .option('-t, --type <type>', 'Generation type (api, architecture, markdown)')
   .option('-i, --interactive', 'Interactive generation')
   .option('--verbose', 'Show detailed output')
   .action(generateCommand);

@@ -9,19 +9,44 @@ import {
   renderDriftMeter,
 } from './components.js';
 import type { ScanResult, HealthReport, DebtIssue, DriftReport } from '../../types/index.js';
+import { isCodeResult, isMarkdownResult } from '../../types/index.js';
 
 export function renderScanResults(results: ScanResult[]): void {
-  const totalFunctions = results.reduce((sum, r) => sum + r.functions.length, 0);
-  const totalClasses = results.reduce((sum, r) => sum + r.classes.length, 0);
-  const documented = results.reduce(
+  console.log(renderHeader('DocuMate', 'Scan Results'));
+
+  // Separate code and markdown results
+  const codeResults = results.filter(isCodeResult);
+  const markdownResults = results.filter(isMarkdownResult);
+
+  // Render code results
+  if (codeResults.length > 0) {
+    renderCodeScanResults(codeResults);
+  }
+
+  // Render markdown results
+  if (markdownResults.length > 0) {
+    renderMarkdownScanResults(markdownResults);
+  }
+
+  // Show helpful tips
+  console.log(chalk.cyan('\n💡 Run "documate health" for a detailed health report'));
+  console.log(chalk.cyan('💡 Run "documate fix -i" to interactively fix issues\n'));
+}
+
+function renderCodeScanResults(results: ScanResult[]): void {
+  const codeResults = results.filter(isCodeResult);
+
+  const totalFunctions = codeResults.reduce((sum, r) => sum + r.functions.length, 0);
+  const totalClasses = codeResults.reduce((sum, r) => sum + r.classes.length, 0);
+  const documented = codeResults.reduce(
     (sum, r) => sum + r.functions.filter((f) => f.hasDocumentation).length,
     0,
   );
-  const totalMethods = results.reduce(
+  const totalMethods = codeResults.reduce(
     (sum, r) => sum + r.classes.reduce((s, c) => s + c.methods.length, 0),
     0,
   );
-  const documentedMethods = results.reduce(
+  const documentedMethods = codeResults.reduce(
     (sum, r) =>
       sum + r.classes.reduce((s, c) => s + c.methods.filter((m) => m.hasDocumentation).length, 0),
     0,
@@ -31,9 +56,13 @@ export function renderScanResults(results: ScanResult[]): void {
   const documentedAll = documented + documentedMethods;
   const coverage = totalAll > 0 ? Math.round((documentedAll / totalAll) * 100) : 100;
 
-  console.log(
-    renderHeader('DocuMate', 'Scan Results'),
-  );
+  // Group by language
+  const languageCounts: Record<string, number> = {};
+  for (const r of codeResults) {
+    languageCounts[r.language] = (languageCounts[r.language] || 0) + 1;
+  }
+
+  console.log(chalk.bold('\n📝 Code Files'));
 
   const table = new Table({
     head: [chalk.cyan('Metric'), chalk.cyan('Value')],
@@ -41,7 +70,13 @@ export function renderScanResults(results: ScanResult[]): void {
   });
 
   table.push(
-    ['Files scanned', results.length.toString()],
+    ['Files scanned', codeResults.length.toString()],
+    [
+      'Languages',
+      Object.entries(languageCounts)
+        .map(([lang, count]) => `${lang} (${count})`)
+        .join(', '),
+    ],
     ['Functions found', totalFunctions.toString()],
     ['Classes found', totalClasses.toString()],
     ['Methods found', totalMethods.toString()],
@@ -52,7 +87,7 @@ export function renderScanResults(results: ScanResult[]): void {
   console.log(table.toString());
 
   // Show undocumented functions
-  const undocumented = results.flatMap((r) =>
+  const undocumented = codeResults.flatMap((r) =>
     r.functions
       .filter((f) => !f.hasDocumentation)
       .map((f) => ({ file: r.file, fn: f })),
@@ -81,9 +116,67 @@ export function renderScanResults(results: ScanResult[]): void {
       console.log(chalk.dim(`\n  ... and ${undocumented.length - 15} more\n`));
     }
   }
+}
 
-  console.log(chalk.cyan('\n💡 Run "documate health" for a detailed health report'));
-  console.log(chalk.cyan('💡 Run "documate fix -i" to interactively fix issues\n'));
+function renderMarkdownScanResults(results: ScanResult[]): void {
+  const markdownResults = results.filter(isMarkdownResult);
+
+  console.log(chalk.bold('\n📄 Markdown Documentation'));
+
+  const totalSections = markdownResults.reduce((sum, r) => sum + r.sections.length, 0);
+  const totalLinks = markdownResults.reduce((sum, r) => sum + r.links.length, 0);
+  const internalLinks = markdownResults.reduce(
+    (sum, r) => sum + r.links.filter((l) => l.isInternal).length,
+    0,
+  );
+  const totalCodeBlocks = markdownResults.reduce((sum, r) => sum + r.codeBlocks.length, 0);
+  const totalCodeRefs = markdownResults.reduce((sum, r) => sum + r.codeReferences.length, 0);
+
+  const table = new Table({
+    head: [chalk.cyan('Metric'), chalk.cyan('Value')],
+    style: { head: [], border: ['gray'] },
+  });
+
+  table.push(
+    ['Files scanned', markdownResults.length.toString()],
+    ['Sections', totalSections.toString()],
+    ['Links', `${totalLinks} (${internalLinks} internal)`],
+    ['Code blocks', totalCodeBlocks.toString()],
+    ['Code references', totalCodeRefs.toString()],
+  );
+
+  console.log(table.toString());
+
+  // Show file breakdown
+  if (markdownResults.length > 0) {
+    console.log(chalk.bold('\n📋 File Breakdown:\n'));
+
+    const fileTable = new Table({
+      head: [
+        chalk.cyan('File'),
+        chalk.cyan('Sections'),
+        chalk.cyan('Links'),
+        chalk.cyan('Code Blocks'),
+      ],
+      style: { head: [], border: ['gray'] },
+    });
+
+    for (const r of markdownResults.slice(0, 10)) {
+      const relFile = relative(process.cwd(), r.file);
+      fileTable.push([
+        relFile,
+        r.sections.length.toString(),
+        r.links.length.toString(),
+        r.codeBlocks.length.toString(),
+      ]);
+    }
+
+    console.log(fileTable.toString());
+
+    if (markdownResults.length > 10) {
+      console.log(chalk.dim(`\n  ... and ${markdownResults.length - 10} more files\n`));
+    }
+  }
 }
 
 export function renderHealthView(health: HealthReport): void {

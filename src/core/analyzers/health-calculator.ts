@@ -1,10 +1,10 @@
-import type { ScanResult, HealthReport, DebtIssue } from '../../types/index.js';
+import type { CodeScanResult, HealthReport, DebtIssue } from '../../types/index.js';
 import { DebtAnalyzer } from './debt-analyzer.js';
 
 export class HealthCalculator {
   private debtAnalyzer = new DebtAnalyzer();
 
-  calculateHealth(scanResults: ScanResult[]): HealthReport {
+  calculateHealth(scanResults: CodeScanResult[]): HealthReport {
     const coverage = this.calculateCoverage(scanResults);
     const freshness = 100; // Requires drift data, default to 100%
     const accuracy = 100; // Requires example validation, default to 100%
@@ -26,7 +26,7 @@ export class HealthCalculator {
     };
   }
 
-  private calculateCoverage(results: ScanResult[]): number {
+  private calculateCoverage(results: CodeScanResult[]): number {
     let total = 0;
     let documented = 0;
 
@@ -46,7 +46,7 @@ export class HealthCalculator {
     return total > 0 ? Math.round((documented / total) * 100) : 100;
   }
 
-  private calculateCompleteness(results: ScanResult[]): number {
+  private calculateCompleteness(results: CodeScanResult[]): number {
     let totalScore = 0;
     let count = 0;
 

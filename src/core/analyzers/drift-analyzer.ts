@@ -1,8 +1,7 @@
-import type { ScanResult, FunctionInfo, DriftReport, SemanticChange } from '../../types/index.js';
+import type { CodeScanResult, FunctionInfo, DriftReport, SemanticChange } from '../../types/index.js';
 import type { GitAnalyzer } from '../../integrations/git.js';
 import type { CopilotWrapper } from '../../copilot/wrapper.js';
 import { detectDriftPrompt } from '../../copilot/prompts.js';
-import { TypeScriptScanner } from '../scanners/typescript-scanner.js';
 import { relative } from 'node:path';
 import { logger } from '../../utils/logger.js';
 import ts from 'typescript';
@@ -13,7 +12,7 @@ export class DriftAnalyzer {
     private copilot?: CopilotWrapper,
   ) {}
 
-  async analyzeDrift(scanResults: ScanResult[], commitLimit: number = 10, sinceDate?: string): Promise<DriftReport[]> {
+  async analyzeDrift(scanResults: CodeScanResult[], commitLimit: number = 10, sinceDate?: string): Promise<DriftReport[]> {
     const reports: DriftReport[] = [];
 
     for (const result of scanResults) {
@@ -133,9 +132,7 @@ export class DriftAnalyzer {
         true,
       );
 
-      const scanner = new TypeScriptScanner();
-      // We need to create a temporary file to scan
-      // For now, we'll manually extract functions from the AST
+      // Manually extract functions from the AST
       const visit = (node: ts.Node): void => {
         if (ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node) || ts.isArrowFunction(node)) {
           const fnInfo = this.extractFunctionInfo(node, sourceFile, filePath);

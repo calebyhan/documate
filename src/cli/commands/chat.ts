@@ -5,6 +5,7 @@ import { loadScanCache } from '../../utils/config.js';
 import { renderHeader, createSpinner } from '../ui/components.js';
 import { logger } from '../../utils/logger.js';
 import type { ScanResult } from '../../types/index.js';
+import { isCodeResult } from '../../types/index.js';
 
 export async function chatCommand(): Promise<void> {
   console.log(renderHeader('DocuMate Chat', 'Powered by GitHub Copilot'));
@@ -22,8 +23,9 @@ export async function chatCommand(): Promise<void> {
   let projectContext = 'No scan data available. Run "documate scan" first for context-aware chat.';
 
   if (scanResults) {
-    const totalFunctions = scanResults.reduce((s, r) => s + r.functions.length, 0);
-    const documented = scanResults.reduce(
+    const codeResults = scanResults.filter(isCodeResult);
+    const totalFunctions = codeResults.reduce((s, r) => s + r.functions.length, 0);
+    const documented = codeResults.reduce(
       (s, r) => s + r.functions.filter((f) => f.hasDocumentation).length,
       0,
     );

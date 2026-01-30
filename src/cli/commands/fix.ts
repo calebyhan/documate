@@ -3,13 +3,15 @@ import { relative } from 'node:path';
 import chalk from 'chalk';
 import { select } from '@inquirer/prompts';
 import { HealthCalculator } from '../../core/analyzers/health-calculator.js';
+import { MarkdownHealthCalculator } from '../../core/analyzers/markdown-health-calculator.js';
 import { DocGenerator } from '../../core/generators/doc-generator.js';
 import { CopilotWrapper } from '../../copilot/wrapper.js';
-import { loadScanCache } from '../../utils/config.js';
+import { loadScanCache, loadConfig } from '../../utils/config.js';
 import { runScan } from './scan.js';
 import { renderHeader, renderPriorityBadge, createSpinner } from '../ui/components.js';
 import { logger, setVerbose } from '../../utils/logger.js';
 import type { ScanResult, DebtIssue } from '../../types/index.js';
+import { isCodeResult, isMarkdownResult } from '../../types/index.js';
 
 export async function fixCommand(options: { interactive?: boolean; verbose?: boolean }): Promise<void> {
   if (options.verbose) {
@@ -22,10 +24,22 @@ export async function fixCommand(options: { interactive?: boolean; verbose?: boo
     results = await runScan();
   }
 
-  const calculator = new HealthCalculator();
-  const health = calculator.calculateHealth(results);
+  // Separate code and markdown results
+  const codeResults = results.filter(isCodeResult);
+  const markdownResults = results.filter(isMarkdownResult);
 
-  if (health.issues.length === 0) {
+  // Calculate health for code files
+  const calculator = new HealthCalculator();
+  const health = calculator.calculateHealth(codeResults);
+
+  // Calculate health for markdown files
+  const config = await loadConfig();
+  const mdCalculator = new MarkdownHealthCalculator(config);
+  const mdHealthReports = mdCalculator.calculateHealth(markdownResults);
+
+  const totalIssues = health.issues.length + mdHealthReports.reduce((sum, r) => sum + r.issues.length, 0);
+
+  if (totalIssues === 0) {
     console.log(renderHeader('DocuMate', 'Fix Documentation'));
     logger.success('No documentation issues found!');
     return;
@@ -33,29 +47,47 @@ export async function fixCommand(options: { interactive?: boolean; verbose?: boo
 
   if (!options.interactive) {
     console.log(renderHeader('DocuMate', 'Fix Documentation'));
-    logger.info(`Found ${health.issues.length} issues.`);
+    logger.info(`Found ${totalIssues} issues.`);
     logger.info('Use --interactive (-i) for guided fix session.\n');
 
-    // Show summary
-    const counts = {
-      critical: health.issues.filter((i) => i.severity === 'critical').length,
-      high: health.issues.filter((i) => i.severity === 'high').length,
-      medium: health.issues.filter((i) => i.severity === 'medium').length,
-      low: health.issues.filter((i) => i.severity === 'low').length,
-    };
+    // Show code issues summary
+    if (health.issues.length > 0) {
+      console.log(chalk.bold('📝 Code Issues:'));
+      const counts = {
+        critical: health.issues.filter((i) => i.severity === 'critical').length,
+        high: health.issues.filter((i) => i.severity === 'high').length,
+        medium: health.issues.filter((i) => i.severity === 'medium').length,
+        low: health.issues.filter((i) => i.severity === 'low').length,
+      };
 
-    for (const [level, count] of Object.entries(counts)) {
-      if (count > 0) {
-        console.log(`  ${renderPriorityBadge(level as DebtIssue['severity'])}: ${count}`);
+      for (const [level, count] of Object.entries(counts)) {
+        if (count > 0) {
+          console.log(`  ${renderPriorityBadge(level as DebtIssue['severity'])}: ${count}`);
+        }
       }
     }
+
+    // Show markdown issues summary
+    if (mdHealthReports.length > 0) {
+      const mdIssueCount = mdHealthReports.reduce((sum, r) => sum + r.issues.length, 0);
+      if (mdIssueCount > 0) {
+        console.log(chalk.bold('\n📄 Markdown Issues:'));
+        for (const report of mdHealthReports) {
+          if (report.issues.length > 0) {
+            const relFile = relative(process.cwd(), report.file);
+            console.log(`  ${relFile}: ${report.issues.length} issue(s)`);
+          }
+        }
+      }
+    }
+
     console.log();
     return;
   }
 
   // Interactive fix session
   console.log(renderHeader('DocuMate', 'Interactive Fix Session'));
-  console.log(chalk.dim(`Found ${health.issues.length} issues. Resolving in priority order.\n`));
+  console.log(chalk.dim(`Found ${totalIssues} issues. Resolving in priority order.\n`));
 
   // Set up Copilot
   const copilot = new CopilotWrapper();
@@ -70,12 +102,13 @@ export async function fixCommand(options: { interactive?: boolean; verbose?: boo
   let applied = 0;
   let skipped = 0;
 
+  // Fix code issues first
   for (let i = 0; i < health.issues.length; i++) {
     const issue = health.issues[i];
     const relFile = relative(process.cwd(), issue.file);
 
     console.log('━'.repeat(50));
-    console.log(chalk.bold(`Issue ${i + 1} of ${health.issues.length}`));
+    console.log(chalk.bold(`Code Issue ${i + 1} of ${health.issues.length}`));
     console.log(renderPriorityBadge(issue.severity));
     console.log('━'.repeat(50));
 
@@ -88,7 +121,7 @@ export async function fixCommand(options: { interactive?: boolean; verbose?: boo
     }
 
     // Find the function in scan results and generate a fix
-    const scanResult = results!.find((r) => r.file === issue.file);
+    const scanResult = codeResults.find((r) => r.file === issue.file);
     const fn = scanResult?.functions.find((f) => f.name === issue.functionName) ??
       scanResult?.classes.flatMap((c) => c.methods).find((m) => m.name === issue.functionName);
 
@@ -135,7 +168,45 @@ export async function fixCommand(options: { interactive?: boolean; verbose?: boo
       logger.warn('Could not locate function in source. Skipping.\n');
     }
 
-    console.log(chalk.dim(`Progress: ${i + 1}/${health.issues.length} issues processed\n`));
+    console.log(chalk.dim(`Progress: ${i + 1}/${health.issues.length} code issues processed\n`));
+  }
+
+  // Show markdown issues (manual fixing required)
+  if (mdHealthReports.length > 0) {
+    const mdIssueCount = mdHealthReports.reduce((sum, r) => sum + r.issues.length, 0);
+
+    if (mdIssueCount > 0) {
+      console.log('\n' + '━'.repeat(50));
+      console.log(chalk.bold('📄 Markdown Issues'));
+      console.log('━'.repeat(50));
+      console.log(chalk.dim('Markdown issues require manual review and fixing.\n'));
+
+      for (const report of mdHealthReports) {
+        if (report.issues.length > 0) {
+          const relFile = relative(process.cwd(), report.file);
+          console.log(chalk.cyan(`\n📁 ${relFile}`));
+          console.log(chalk.yellow(`Score: ${report.score}/100\n`));
+
+          for (const issue of report.issues) {
+            console.log(chalk.red(`  ✗ ${issue}`));
+          }
+
+          if (report.suggestions.length > 0) {
+            console.log(chalk.dim('\n  Suggestions:'));
+            for (const suggestion of report.suggestions) {
+              console.log(chalk.dim(`    • ${suggestion}`));
+            }
+          }
+
+          if (report.missingSections.length > 0) {
+            console.log(chalk.dim('\n  Missing sections:'));
+            for (const section of report.missingSections) {
+              console.log(chalk.dim(`    • ${section}`));
+            }
+          }
+        }
+      }
+    }
   }
 
   // Summary
