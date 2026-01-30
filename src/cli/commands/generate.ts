@@ -10,6 +10,7 @@ import { createSpinner, renderHeader } from '../ui/components.js';
 import { logger, setVerbose } from '../../utils/logger.js';
 import { loadScanCache, loadConfig } from '../../utils/config.js';
 import { runScan } from './scan.js';
+import { metrics } from '../../utils/metrics.js';
 import { isCodeResult } from '../../types/index.js';
 import type { ScanResult } from '../../types/index.js';
 
@@ -189,6 +190,7 @@ async function generateCodeDocs(
         const indentedDoc = doc.split('\n').map((l) => indent + l).join('\n');
         lines.splice(insertLine, 0, indentedDoc);
         await writeFile(filePath, lines.join('\n'));
+        metrics.recordDocGenerated();
         logger.success(`Documentation applied to ${fn.name}!`);
       } else if (action === 'quit') {
         break;

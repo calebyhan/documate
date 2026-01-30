@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
+import chalk from 'chalk';
 import { scanCommand } from './commands/scan.js';
 import { healthCommand } from './commands/health.js';
 import { driftCommand } from './commands/drift.js';
@@ -7,6 +8,8 @@ import { fixCommand } from './commands/fix.js';
 import { generateCommand } from './commands/generate.js';
 import { chatCommand } from './commands/chat.js';
 import { configCommand } from './commands/config.js';
+import { setExplainMode } from '../copilot/wrapper.js';
+import { metrics } from '../utils/metrics.js';
 
 const program = new Command();
 
@@ -14,7 +17,22 @@ program
   .name('documate')
   .description('AI-powered documentation assistant')
   .version('0.1.0')
-  .option('--no-color', 'Disable colors');
+  .option('--no-color', 'Disable colors')
+  .option('--explain', 'Show Copilot prompts and responses for transparency')
+  .option('--stats', 'Show session metrics after command execution')
+  .hook('preAction', (thisCommand) => {
+    const opts = thisCommand.opts();
+    if (opts.explain) {
+      setExplainMode(true);
+    }
+  })
+  .hook('postAction', (thisCommand) => {
+    const opts = thisCommand.opts();
+    if (opts.stats) {
+      console.log(chalk.dim('\n' + '─'.repeat(60)));
+      console.log(metrics.getSummary());
+    }
+  });
 
 program
   .command('scan')

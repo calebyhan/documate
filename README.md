@@ -4,15 +4,26 @@
 
 DocuMate is a CLI tool that helps maintain high-quality code documentation by analyzing your TypeScript codebase, identifying documentation gaps, detecting drift, and generating JSDoc comments using GitHub Copilot.
 
+## Demo
+
+<p align="center">
+  <img src="docs/images/health.png" alt="DocuMate Health Dashboard" width="600">
+  <br>
+  <em>DocuMate's documentation health dashboard powered by GitHub Copilot CLI</em>
+</p>
+
 ## Features
 
-- **📊 Documentation Scanning** - Analyze TypeScript files to detect documented and undocumented code
+- **📊 Documentation Scanning** - Analyze TypeScript, JavaScript, Python, and Markdown files to detect documented and undocumented code
 - **💯 Health Scoring** - Calculate documentation health based on coverage, completeness, freshness, and accuracy
-- **🔍 Drift Detection** - Find code that changed without corresponding documentation updates
-- **✨ AI Generation** - Generate JSDoc comments using GitHub Copilot CLI (optional)
+- **🔍 Drift Detection** - Find code that changed without corresponding documentation updates in both code and markdown files
+- **✨ AI Generation** - Generate JSDoc comments and markdown documentation using GitHub Copilot CLI (optional)
 - **🔧 Interactive Fixes** - Guided workflow to review and apply documentation fixes
 - **💬 Chat Mode** - Conversational AI assistant for documentation questions
 - **📈 Debt Analysis** - Prioritize undocumented code by visibility, complexity, and impact
+- **📊 Session Metrics** - Track Copilot API usage, cache hit rates, and performance statistics
+- **🔍 Explain Mode** - See exactly what prompts are sent to Copilot and what responses are received
+- **🌐 Multi-Language Support** - TypeScript, JavaScript (.ts, .tsx, .js, .jsx), Python (.py), and Markdown (.md)
 
 ## Installation
 
@@ -52,6 +63,9 @@ documate fix -i
 # Generate docs for a specific file
 documate generate src/myfile.ts -i
 
+# Generate markdown documentation
+documate generate docs/api.md --type api -i
+
 # Chat with DocuMate
 documate chat
 
@@ -59,20 +73,41 @@ documate chat
 documate config --init
 ```
 
+**Global Options** (work with any command):
+```bash
+# Show Copilot prompts and responses for transparency
+documate <command> --explain
+
+# Display session metrics after command execution
+documate <command> --stats
+
+# Examples:
+documate drift --explain --stats
+documate scan src/ --stats
+documate health --explain
+```
+
 ## Commands
 
-### `documate scan <path>`
+### `documate scan [path]`
 
-Scan TypeScript files and analyze documentation coverage.
+Scan TypeScript, JavaScript, Python, and Markdown files to analyze documentation coverage.
 
 **Options:**
-- `--verbose, -v` - Show detailed output
+- `--verbose` - Show detailed output
 - `--json` - Output results as JSON
+
+**Supported Files:**
+- TypeScript/JavaScript: `.ts`, `.tsx`, `.js`, `.jsx`
+- Python: `.py`
+- Markdown: `.md`
 
 **Example:**
 ```bash
 documate scan src/
+documate scan .                                    # Scan current directory
 documate scan src/auth/user-service.ts --verbose
+documate scan --json > report.json                # Export as JSON
 ```
 
 ### `documate health`
@@ -90,16 +125,20 @@ documate health
 
 ### `documate drift`
 
-Detect code changes without corresponding documentation updates using git history.
+Detect code changes without corresponding documentation updates using git history. Analyzes both code files and markdown documentation.
 
 **Options:**
-- `--since <date>` - Check drift since specific date
+- `-f, --file <path>` - Analyze a specific file
 - `--commits <number>` - Number of commits to analyze (default: 10)
+- `--since <date>` - Check drift since specific date
+- `--verbose` - Show detailed output
 
 **Example:**
 ```bash
 documate drift
 documate drift --commits 20
+documate drift --file src/utils/helpers.ts
+documate drift --since "2024-01-01"
 ```
 
 ### `documate fix`
@@ -117,16 +156,33 @@ documate fix -i        # Interactive fix session
 
 ### `documate generate <target>`
 
-Generate documentation for a file or specific function.
+Generate documentation for code files or create markdown documentation.
+
+**For Code Files:**
+Generate JSDoc/TSDoc comments for undocumented functions.
+
+**For Markdown Files:**
+Generate API reference or architecture documentation based on your codebase.
 
 **Options:**
-- `--style <style>` - Documentation style: `jsdoc` (default) or `tsdoc`
-- `--interactive, -i` - Review and apply interactively
+- `-s, --style <style>` - Documentation style: `jsdoc` (default) or `tsdoc` (for code)
+- `-t, --type <type>` - Generation type: `api` or `architecture` (for markdown)
+- `-i, --interactive` - Review and apply interactively
+- `--verbose` - Show detailed output
 
-**Example:**
+**Examples:**
 ```bash
-documate generate src/utils/helpers.ts
+# Generate JSDoc for undocumented functions in a file
+documate generate src/utils/helpers.ts -i
+
+# Generate docs for a specific function
 documate generate src/auth/service.ts:authenticateUser -i
+
+# Generate markdown API reference
+documate generate docs/api.md --type api -i
+
+# Generate architecture overview
+documate generate docs/architecture.md --type architecture -i
 ```
 
 ### `documate chat`
@@ -186,10 +242,10 @@ DocuMate uses a `.documate.json` configuration file in your project root:
 - `documentation.style` - JSDoc or TSDoc format
 - `documentation.includeExamples` - Generate @example blocks
 - `documentation.includeTypes` - Include @param and @returns type info
-- `scan.include` - Glob patterns for files to scan
+- `scan.include` - Glob patterns for files to scan (supports `.ts`, `.tsx`, `.js`, `.jsx`, `.py`, `.md`)
 - `scan.exclude` - Glob patterns to ignore
-- `health.*Weight` - Adjust health score calculation weights
-- `health.minScore` - Minimum acceptable health score
+- `health.*Weight` - Adjust health score calculation weights (must sum to 1.0)
+- `health.minScore` - Minimum acceptable health score (0-100)
 - `copilot.enabled` - Use GitHub Copilot for AI features
 - `copilot.timeout` - Copilot request timeout in milliseconds
 
@@ -209,6 +265,51 @@ DocuMate optionally integrates with GitHub Copilot CLI for AI-powered features:
 - Fix suggestions
 
 **Fallback:** All features work without Copilot using template-based generation and heuristic analysis.
+
+### Transparency & Debugging
+
+DocuMate provides two global options (see [Quick Start](#quick-start)) for transparency and debugging:
+
+**Explain Mode** (`--explain`): See exactly what DocuMate sends to Copilot and what it receives back. Works with any command.
+
+```bash
+documate drift --explain
+
+# Shows detailed output:
+# 🤖 GitHub Copilot CLI - Explain Mode
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 📤 Prompt sent to Copilot:
+# [Full prompt text...]
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 📥 Copilot response:
+# [Full response...]
+```
+
+**Session Metrics** (`--stats`): Track Copilot usage, performance, and analysis statistics. Works with any command.
+
+```bash
+documate scan src/ --stats
+
+# After command completes:
+# ─────────────────────────────────────────────────────────
+# 📊 Session Metrics
+#
+# 🤖 GitHub Copilot:
+#    Total API calls: 15
+#    Cache hits: 3 (20%)
+#    Failed calls: 0
+#    Average response time: 1247ms
+#    Explain calls: 10
+#    Suggest calls: 5
+#
+# 📈 Analysis:
+#    Files scanned: 42
+#    Functions analyzed: 156
+#    Semantic changes detected: 8
+#    Drift issues found: 12
+#
+# ⏱️  Session duration: 23s
+```
 
 ## Testing with Messy Project
 
@@ -253,8 +354,11 @@ npm run dev -- scan src/
 # Build TypeScript
 npm run build
 
-# Run tests (when added)
+# Run tests
 npm test
+
+# Run tests in watch mode
+npm run test:watch
 
 # Type checking
 npx tsc --noEmit
@@ -308,12 +412,15 @@ See [LICENSE](LICENSE) file.
 
 ## Roadmap
 
-- [ ] Add unit tests
-- [ ] Support JavaScript files
-- [ ] Multi-language support (Python, Go, Rust via tree-sitter)
+- [x] Support JavaScript files
+- [x] Python support (.py files)
+- [x] Markdown documentation analysis
+- [x] Basic unit tests
+- [ ] Expand test coverage
+- [ ] Additional language support (Go, Rust, Java via tree-sitter)
 - [ ] VS Code extension
 - [ ] CI/CD integration (GitHub Actions, GitLab CI)
-- [ ] HTML/Markdown report generation
+- [ ] HTML report generation with charts and graphs
 - [ ] Custom documentation templates
-- [ ] Team collaboration features
-- [ ] Documentation metrics dashboard
+- [ ] Team collaboration features (shared configs, team metrics)
+- [ ] Documentation metrics dashboard (web UI)

@@ -19,6 +19,44 @@ export function isValidPassword(password: string): boolean {
 }
 
 // Complex validation, no docs
+/**
+ * Validates order input data to ensure it meets all required criteria for processing an order.
+ * Performs comprehensive validation of order structure, user identification, items, and total amount.
+ *
+ * @param {unknown} input - The input data to validate, expected to be an order object
+ * @returns {{ valid: boolean; error?: string }} Validation result object
+ *   - `valid`: `true` if validation passes, `false` otherwise
+ *   - `error`: Error message describing what failed (only present when `valid` is `false`)
+ *
+ * @example
+ * // Valid order
+ * const result = validateOrderInput({
+ *   userId: "user123",
+ *   items: [
+ *     { productId: "prod1", quantity: 2, price: 29.99 },
+ *     { productId: "prod2", quantity: 1, price: 15.50 }
+ *   ],
+ *   total: 75.48
+ * });
+ * // Returns: { valid: true }
+ *
+ * @example
+ * // Invalid order - missing userId
+ * const result = validateOrderInput({
+ *   items: [{ productId: "prod1", quantity: 1, price: 10 }],
+ *   total: 10
+ * });
+ * // Returns: { valid: false, error: "userId is required" }
+ *
+ * @throws {never} Does not throw errors; returns validation results in the return object
+ *
+ * @remarks
+ * - The input type is intentionally `unknown` for runtime type safety
+ * - All items must have `productId`, `quantity`, and `price` properties
+ * - The `total` must be a positive number greater than zero
+ * - Empty item arrays are not permitted
+ * - The function does not verify if the total matches the sum of item prices
+ */
 export function validateOrderInput(input: unknown): { valid: boolean; error?: string } {
   if (typeof input !== 'object' || input === null) {
     return { valid: false, error: 'Input must be an object' };

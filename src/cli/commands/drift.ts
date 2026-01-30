@@ -10,6 +10,7 @@ import { runScan } from './scan.js';
 import { renderDriftResults } from '../ui/views.js';
 import { createSpinner } from '../ui/components.js';
 import { logger, setVerbose } from '../../utils/logger.js';
+import { metrics } from '../../utils/metrics.js';
 import type { ScanResult, DriftReport, MarkdownDriftFileReport } from '../../types/index.js';
 import { isCodeResult, isMarkdownResult } from '../../types/index.js';
 
@@ -78,6 +79,14 @@ export async function driftCommand(options: { file?: string; verbose?: boolean; 
 
     const analyzer = new DriftAnalyzer(git, copilotInstance);
     codeDriftReports = await analyzer.analyzeDrift(codeResults, commitLimit, options.since);
+
+    // Record metrics
+    codeDriftReports.forEach(report => {
+      metrics.recordDriftIssue();
+      if (report.changes.length > 0) {
+        metrics.recordSemanticChange();
+      }
+    });
 
     spinner.succeed(`Code drift analysis complete! Found ${codeDriftReports.length} drift issues.`);
   }

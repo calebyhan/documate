@@ -6,6 +6,7 @@ import { loadConfig, saveScanCache } from '../../utils/config.js';
 import { createProgressBar } from '../ui/components.js';
 import { renderScanResults } from '../ui/views.js';
 import { logger, setVerbose } from '../../utils/logger.js';
+import { metrics } from '../../utils/metrics.js';
 import type { ScanResult } from '../../types/index.js';
 
 export async function scanCommand(path: string, options: { verbose?: boolean; json?: boolean }): Promise<void> {
@@ -66,6 +67,18 @@ export async function scanCommand(path: string, options: { verbose?: boolean; js
     progress.stop();
     console.log();
 
+    // Record metrics
+    metrics.recordFilesScanned(results.length);
+    const totalFunctions = results.reduce((sum, r) => {
+      if ('functions' in r) {
+        return sum + r.functions.length;
+      }
+      return sum;
+    }, 0);
+    if (totalFunctions > 0) {
+      metrics.recordFunctionsAnalyzed(totalFunctions);
+    }
+
     // Save scan results to cache
     await saveScanCache(results);
     renderScanResults(results);
@@ -82,6 +95,18 @@ export async function scanCommand(path: string, options: { verbose?: boolean; js
       } catch (err) {
         // Silently skip failed files in JSON mode
       }
+    }
+
+    // Record metrics
+    metrics.recordFilesScanned(results.length);
+    const totalFunctions = results.reduce((sum, r) => {
+      if ('functions' in r) {
+        return sum + r.functions.length;
+      }
+      return sum;
+    }, 0);
+    if (totalFunctions > 0) {
+      metrics.recordFunctionsAnalyzed(totalFunctions);
     }
 
     // Save scan results to cache

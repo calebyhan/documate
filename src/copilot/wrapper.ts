@@ -1,12 +1,20 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import chalk from 'chalk';
 import type { CopilotResponse } from '../types/index.js';
 import { extractJsonFromResponse } from './parsers.js';
 import { logger } from '../utils/logger.js';
+import { metrics } from '../utils/metrics.js';
 
 const DEFAULT_TIMEOUT = 30_000;
 const MAX_RETRIES = 2;
 const RETRY_DELAY = 1000; // 1 second
+
+let explainMode = false;
+
+export function setExplainMode(enabled: boolean): void {
+  explainMode = enabled;
+}
 
 export class CopilotWrapper {
   private timeout: number;
@@ -22,15 +30,45 @@ export class CopilotWrapper {
   async explain(prompt: string, options?: { skipCache?: boolean }): Promise<CopilotResponse> {
     return this.runWithRetry(async () => {
       const cacheKey = this.getCacheKey('explain', prompt);
+      const startTime = Date.now();
+      let fromCache = false;
 
       // Check cache
       if (!options?.skipCache && this.cache.has(cacheKey)) {
         logger.debug('Using cached Copilot response');
-        return this.cache.get(cacheKey)!;
+        fromCache = true;
+        const cached = this.cache.get(cacheKey)!;
+        metrics.recordCopilotCall('explain', 0, true);
+
+        if (explainMode) {
+          this.showExplainOutput('explain', prompt, cached.raw, true);
+        }
+
+        return cached;
+      }
+
+      if (explainMode) {
+        console.log(chalk.cyan('\n🤖 GitHub Copilot CLI - Explain Mode'));
+        console.log(chalk.dim('━'.repeat(60)));
+        console.log(chalk.bold('📤 Prompt sent to Copilot:'));
+        console.log(chalk.dim(this.truncatePrompt(prompt)));
+        console.log(chalk.dim('━'.repeat(60)));
       }
 
       const output = await this.runGhCopilot('explain', prompt);
       const response = this.processResponse(output);
+      const duration = Date.now() - startTime;
+
+      // Record metrics
+      if (response.success) {
+        metrics.recordCopilotCall('explain', duration, false);
+      } else {
+        metrics.recordCopilotFailure();
+      }
+
+      if (explainMode) {
+        this.showExplainOutput('explain', prompt, output, false);
+      }
 
       // Cache successful responses
       if (response.success) {
@@ -47,15 +85,45 @@ export class CopilotWrapper {
   async suggest(prompt: string, options?: { skipCache?: boolean }): Promise<CopilotResponse> {
     return this.runWithRetry(async () => {
       const cacheKey = this.getCacheKey('suggest', prompt);
+      const startTime = Date.now();
+      let fromCache = false;
 
       // Check cache
       if (!options?.skipCache && this.cache.has(cacheKey)) {
         logger.debug('Using cached Copilot response');
-        return this.cache.get(cacheKey)!;
+        fromCache = true;
+        const cached = this.cache.get(cacheKey)!;
+        metrics.recordCopilotCall('suggest', 0, true);
+
+        if (explainMode) {
+          this.showExplainOutput('suggest', prompt, cached.raw, true);
+        }
+
+        return cached;
+      }
+
+      if (explainMode) {
+        console.log(chalk.cyan('\n🤖 GitHub Copilot CLI - Suggest Mode'));
+        console.log(chalk.dim('━'.repeat(60)));
+        console.log(chalk.bold('📤 Prompt sent to Copilot:'));
+        console.log(chalk.dim(this.truncatePrompt(prompt)));
+        console.log(chalk.dim('━'.repeat(60)));
       }
 
       const output = await this.runGhCopilot('suggest', prompt);
       const response = this.processResponse(output);
+      const duration = Date.now() - startTime;
+
+      // Record metrics
+      if (response.success) {
+        metrics.recordCopilotCall('suggest', duration, false);
+      } else {
+        metrics.recordCopilotFailure();
+      }
+
+      if (explainMode) {
+        this.showExplainOutput('suggest', prompt, output, false);
+      }
 
       // Cache successful responses
       if (response.success) {
@@ -84,18 +152,10 @@ export class CopilotWrapper {
       };
     }
 
+    // Try to extract JSON if present
     const parsed = extractJsonFromResponse(output);
 
-    // Validate that parsing was successful when JSON is expected
-    if (!parsed && (lowerOutput.includes('{') || lowerOutput.includes('json'))) {
-      logger.warn('Failed to parse JSON from Copilot response');
-      return {
-        raw: output,
-        success: false,
-        error: 'Failed to parse JSON from response',
-      };
-    }
-
+    // For non-JSON responses (like JSDoc), success is still true if we got output
     return {
       raw: output,
       parsed: parsed ?? undefined,
@@ -154,6 +214,41 @@ export class CopilotWrapper {
     logger.debug('Copilot cache cleared');
   }
 
+  /**
+   * Display explain mode output
+   */
+  private showExplainOutput(command: string, prompt: string, response: string, fromCache: boolean): void {
+    if (fromCache) {
+      console.log(chalk.yellow('💾 Response from cache'));
+    } else {
+      console.log(chalk.bold('📥 Copilot response:'));
+      console.log(chalk.dim(this.truncateResponse(response)));
+    }
+    console.log(chalk.dim('━'.repeat(60) + '\n'));
+  }
+
+  /**
+   * Truncate prompt for display
+   */
+  private truncatePrompt(prompt: string): string {
+    const maxLength = 500;
+    if (prompt.length <= maxLength) {
+      return prompt;
+    }
+    return prompt.substring(0, maxLength) + '\n... (truncated)';
+  }
+
+  /**
+   * Truncate response for display
+   */
+  private truncateResponse(response: string): string {
+    const maxLength = 800;
+    if (response.length <= maxLength) {
+      return response;
+    }
+    return response.substring(0, maxLength) + '\n... (truncated)';
+  }
+
   async checkPrerequisites(): Promise<{ ok: boolean; error?: string }> {
     // Check gh is installed
     try {
@@ -162,11 +257,11 @@ export class CopilotWrapper {
       return { ok: false, error: 'GitHub CLI (gh) is not installed. Install it from https://cli.github.com/' };
     }
 
-    // Check copilot command is available (either built-in or as extension)
+    // Check copilot command is available (new CLI)
     try {
-      await this.runCommand('gh', ['copilot', '--help']);
+      await this.runCommand('gh', ['copilot', '--', '--version']);
     } catch {
-      return { ok: false, error: 'GitHub Copilot not available. Ensure you have gh CLI v2.50.0+ or run: gh extension install github/gh-copilot' };
+      return { ok: false, error: 'GitHub Copilot CLI not available. Run: gh copilot (it will auto-install)' };
     }
 
     // Check auth
@@ -183,7 +278,8 @@ export class CopilotWrapper {
     logger.debug(`Running gh copilot ${command}`);
 
     return new Promise((resolve, reject) => {
-      const child = spawn('gh', ['copilot', command, prompt], {
+      // New Copilot CLI syntax: gh copilot -- -p "prompt" --allow-all-tools
+      const child = spawn('gh', ['copilot', '--', '-p', prompt, '--allow-all-tools'], {
         env: { ...process.env },
         stdio: ['pipe', 'pipe', 'pipe'],
       });
