@@ -19,10 +19,14 @@ export class GitAnalyzer {
     }
   }
 
-  async getFileHistory(filePath: string, limit: number = 10): Promise<CommitInfo[]> {
+  async getFileHistory(filePath: string, limit: number = 10, since?: string): Promise<CommitInfo[]> {
     try {
-      logger.debug(`Getting file history for ${filePath} (limit: ${limit})`);
-      const log = await this.git.log({ file: filePath, maxCount: limit });
+      logger.debug(`Getting file history for ${filePath} (limit: ${limit}${since ? `, since: ${since}` : ''})`);
+      const logOptions: any = { file: filePath, maxCount: limit };
+      if (since) {
+        logOptions['--since'] = since;
+      }
+      const log = await this.git.log(logOptions);
       return log.all.map((entry) => ({
         hash: entry.hash,
         date: entry.date,

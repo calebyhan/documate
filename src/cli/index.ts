@@ -14,8 +14,6 @@ program
   .name('documate')
   .description('AI-powered documentation assistant')
   .version('0.1.0')
-  .option('--verbose', 'Show detailed output')
-  .option('--json', 'Output as JSON')
   .option('--no-color', 'Disable colors');
 
 program
@@ -36,6 +34,8 @@ program
   .command('drift')
   .description('Detect documentation drift')
   .option('-f, --file <path>', 'Analyze a specific file')
+  .option('--commits <number>', 'Number of commits to analyze', '10')
+  .option('--since <date>', 'Check drift since specific date')
   .option('--verbose', 'Show detailed output')
   .action(driftCommand);
 
@@ -43,6 +43,7 @@ program
   .command('fix')
   .description('Fix documentation issues')
   .option('-i, --interactive', 'Interactive fix session')
+  .option('--verbose', 'Show detailed output')
   .action(fixCommand);
 
 program
@@ -51,6 +52,7 @@ program
   .argument('<target>', 'File or file:function to document')
   .option('-s, --style <style>', 'Documentation style', 'jsdoc')
   .option('-i, --interactive', 'Interactive generation')
+  .option('--verbose', 'Show detailed output')
   .action(generateCommand);
 
 program

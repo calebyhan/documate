@@ -1,4 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises';
+import { relative } from 'node:path';
 import chalk from 'chalk';
 import { select } from '@inquirer/prompts';
 import { HealthCalculator } from '../../core/analyzers/health-calculator.js';
@@ -7,10 +8,14 @@ import { CopilotWrapper } from '../../copilot/wrapper.js';
 import { loadScanCache } from '../../utils/config.js';
 import { runScan } from './scan.js';
 import { renderHeader, renderPriorityBadge, createSpinner } from '../ui/components.js';
-import { logger } from '../../utils/logger.js';
+import { logger, setVerbose } from '../../utils/logger.js';
 import type { ScanResult, DebtIssue } from '../../types/index.js';
 
-export async function fixCommand(options: { interactive?: boolean }): Promise<void> {
+export async function fixCommand(options: { interactive?: boolean; verbose?: boolean }): Promise<void> {
+  if (options.verbose) {
+    setVerbose(true);
+  }
+
   let results = (await loadScanCache()) as ScanResult[] | null;
   if (!results) {
     logger.info('No cached scan results. Running scan first...\n');
@@ -67,7 +72,7 @@ export async function fixCommand(options: { interactive?: boolean }): Promise<vo
 
   for (let i = 0; i < health.issues.length; i++) {
     const issue = health.issues[i];
-    const relFile = issue.file.replace(process.cwd() + '/', '');
+    const relFile = relative(process.cwd(), issue.file);
 
     console.log('━'.repeat(50));
     console.log(chalk.bold(`Issue ${i + 1} of ${health.issues.length}`));

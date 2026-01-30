@@ -6,10 +6,20 @@ import { loadScanCache } from '../../utils/config.js';
 import { runScan } from './scan.js';
 import { renderDriftResults } from '../ui/views.js';
 import { createSpinner } from '../ui/components.js';
-import { logger } from '../../utils/logger.js';
+import { logger, setVerbose } from '../../utils/logger.js';
 import type { ScanResult } from '../../types/index.js';
 
-export async function driftCommand(options: { file?: string; verbose?: boolean }): Promise<void> {
+export async function driftCommand(options: { file?: string; verbose?: boolean; commits?: string; since?: string }): Promise<void> {
+  if (options.verbose) {
+    setVerbose(true);
+  }
+
+  const commitLimit = options.commits ? parseInt(options.commits, 10) : 10;
+  if (isNaN(commitLimit) || commitLimit < 1) {
+    logger.error('--commits must be a positive number');
+    process.exit(1);
+  }
+
   const git = new GitAnalyzer();
 
   if (!(await git.isGitRepo())) {
@@ -51,7 +61,7 @@ export async function driftCommand(options: { file?: string; verbose?: boolean }
   spinner.start();
 
   const analyzer = new DriftAnalyzer(git, copilotInstance);
-  const reports = await analyzer.analyzeDrift(results);
+  const reports = await analyzer.analyzeDrift(results, commitLimit, options.since);
 
   spinner.succeed(`Drift analysis complete! Found ${reports.length} drift issues.`);
   console.log();

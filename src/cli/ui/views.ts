@@ -1,3 +1,4 @@
+import { relative } from 'node:path';
 import chalk from 'chalk';
 import Table from 'cli-table3';
 import {
@@ -65,7 +66,7 @@ export function renderScanResults(results: ScanResult[]): void {
     });
 
     for (const { file, fn } of undocumented.slice(0, 15)) {
-      const relFile = file.replace(process.cwd() + '/', '');
+      const relFile = relative(process.cwd(), file);
       issueTable.push([
         fn.name,
         relFile,
@@ -122,7 +123,7 @@ export function renderIssueList(issues: DebtIssue[]): void {
     if (items.length === 0) continue;
     console.log(`\n${renderPriorityBadge(level as DebtIssue['severity'])} (${items.length})`);
     for (const issue of items.slice(0, 5)) {
-      const relFile = issue.file.replace(process.cwd() + '/', '');
+      const relFile = relative(process.cwd(), issue.file);
       console.log(`  ${relFile}:${issue.functionName}()`);
       console.log(chalk.dim(`  └─ ${issue.reason}`));
       if (issue.suggestion) {
@@ -146,7 +147,7 @@ export function renderDriftResults(reports: DriftReport[]): void {
   console.log(chalk.yellow(`\n⚠ Found ${reports.length} functions with documentation drift:\n`));
 
   for (const report of reports) {
-    const relFile = report.file.replace(process.cwd() + '/', '');
+    const relFile = relative(process.cwd(), report.file);
     console.log(chalk.bold(`📁 ${relFile}:${report.functionName}()`));
     console.log(`   Drift Score: ${renderDriftMeter(report.driftScore)}`);
 

@@ -6,12 +6,16 @@ import { TypeScriptScanner } from '../../core/scanners/typescript-scanner.js';
 import { DocGenerator } from '../../core/generators/doc-generator.js';
 import { CopilotWrapper } from '../../copilot/wrapper.js';
 import { createSpinner, renderHeader } from '../ui/components.js';
-import { logger } from '../../utils/logger.js';
+import { logger, setVerbose } from '../../utils/logger.js';
 
 export async function generateCommand(
   target: string,
-  options: { style?: string; interactive?: boolean },
+  options: { style?: string; interactive?: boolean; verbose?: boolean },
 ): Promise<void> {
+  if (options.verbose) {
+    setVerbose(true);
+  }
+
   // Parse target: file.ts or file.ts:functionName
   const [filePart, functionName] = target.split(':');
   const filePath = resolve(filePart);

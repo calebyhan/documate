@@ -3,10 +3,14 @@ import { loadScanCache } from '../../utils/config.js';
 import { runScan } from './scan.js';
 import { renderHealthView } from '../ui/views.js';
 import { createSpinner } from '../ui/components.js';
-import { logger } from '../../utils/logger.js';
+import { logger, setVerbose } from '../../utils/logger.js';
 import type { ScanResult } from '../../types/index.js';
 
 export async function healthCommand(options: { verbose?: boolean }): Promise<void> {
+  if (options.verbose) {
+    setVerbose(true);
+  }
+
   let results = (await loadScanCache()) as ScanResult[] | null;
 
   if (!results) {

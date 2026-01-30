@@ -13,22 +13,22 @@ export class DriftAnalyzer {
     private copilot?: CopilotWrapper,
   ) {}
 
-  async analyzeDrift(scanResults: ScanResult[]): Promise<DriftReport[]> {
+  async analyzeDrift(scanResults: ScanResult[], commitLimit: number = 10, sinceDate?: string): Promise<DriftReport[]> {
     const reports: DriftReport[] = [];
 
     for (const result of scanResults) {
-      const fileReports = await this.analyzeFileDrift(result.file, result.functions);
+      const fileReports = await this.analyzeFileDrift(result.file, result.functions, commitLimit, sinceDate);
       reports.push(...fileReports);
     }
 
     return reports.sort((a, b) => b.driftScore - a.driftScore);
   }
 
-  async analyzeFileDrift(filePath: string, functions: FunctionInfo[]): Promise<DriftReport[]> {
+  async analyzeFileDrift(filePath: string, functions: FunctionInfo[], commitLimit: number = 10, sinceDate?: string): Promise<DriftReport[]> {
     const reports: DriftReport[] = [];
     const relPath = relative(process.cwd(), filePath);
 
-    const history = await this.git.getFileHistory(relPath, 5);
+    const history = await this.git.getFileHistory(relPath, commitLimit, sinceDate);
     if (history.length < 2) {
       logger.debug(`Insufficient history for ${relPath} (${history.length} commits)`);
       return reports;
