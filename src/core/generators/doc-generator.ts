@@ -1,10 +1,35 @@
-import type { FunctionInfo } from '../../types/index.js';
+import type { FunctionInfo, ClassInfo } from '../../types/index.js';
 import type { CopilotWrapper } from '../../copilot/wrapper.js';
 import { generateDocPrompt } from '../../copilot/prompts.js';
 import { extractCodeBlockFromResponse } from '../../copilot/parsers.js';
 
 export class DocGenerator {
   constructor(private copilot?: CopilotWrapper) {}
+
+  async generateForClass(cls: ClassInfo, code: string, style: string = 'jsdoc'): Promise<string> {
+    if (this.copilot) {
+      try {
+        const response = await this.copilot.suggest(generateDocPrompt(code, style));
+        if (response.success) {
+          const extracted = extractCodeBlockFromResponse(response.raw);
+          if (extracted && extracted.includes('/**')) return extracted;
+          const jsdocMatch = response.raw.match(/(\/\*\*[\s\S]*?\*\/)/);
+          if (jsdocMatch) return jsdocMatch[1];
+        }
+      } catch {
+        // Fall through to template
+      }
+    }
+
+    return this.generateClassTemplate(cls, style);
+  }
+
+  generateClassTemplate(cls: ClassInfo, _style: string = 'jsdoc'): string {
+    const lines: string[] = ['/**'];
+    lines.push(` * ${cls.name} - TODO: Add class description`);
+    lines.push(' */');
+    return lines.join('\n');
+  }
 
   async generateForFunction(fn: FunctionInfo, code: string, style: string = 'jsdoc'): Promise<string> {
     if (this.copilot) {

@@ -25,7 +25,8 @@ export class DriftAnalyzer {
 
   async analyzeFileDrift(filePath: string, functions: FunctionInfo[], commitLimit: number = 10, sinceDate?: string): Promise<DriftReport[]> {
     const reports: DriftReport[] = [];
-    const relPath = relative(process.cwd(), filePath);
+    const repoRoot = await this.git.getRepoRoot();
+    const relPath = relative(repoRoot, filePath);
 
     const history = await this.git.getFileHistory(relPath, commitLimit, sinceDate);
     if (history.length < 2) {

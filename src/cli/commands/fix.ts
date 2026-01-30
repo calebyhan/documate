@@ -10,7 +10,7 @@ import { loadScanCache, loadConfig } from '../../utils/config.js';
 import { runScan } from './scan.js';
 import { renderHeader, renderPriorityBadge, createSpinner } from '../ui/components.js';
 import { logger, setVerbose } from '../../utils/logger.js';
-import type { ScanResult, DebtIssue } from '../../types/index.js';
+import type { ScanResult, DebtIssue, ClassInfo } from '../../types/index.js';
 import { isCodeResult, isMarkdownResult } from '../../types/index.js';
 
 export async function fixCommand(options: { interactive?: boolean; verbose?: boolean }): Promise<void> {
@@ -123,6 +123,7 @@ export async function fixCommand(options: { interactive?: boolean; verbose?: boo
     // Find the function in scan results and generate a fix
     const scanResult = codeResults.find((r) => r.file === issue.file);
     const fn = scanResult?.functions.find((f) => f.name === issue.functionName) ??
+      scanResult?.classes.find((c) => c.name === issue.functionName) ??
       scanResult?.classes.flatMap((c) => c.methods).find((m) => m.name === issue.functionName);
 
     if (fn) {
@@ -131,7 +132,11 @@ export async function fixCommand(options: { interactive?: boolean; verbose?: boo
 
       const content = await readFile(issue.file, 'utf-8');
       const fnCode = content.split('\n').slice(fn.location.startLine - 1, fn.location.endLine).join('\n');
-      const doc = await generator.generateForFunction(fn, fnCode);
+
+      // Check if fn is a ClassInfo or FunctionInfo and generate appropriate documentation
+      const doc = 'methods' in fn
+        ? await generator.generateForClass(fn as ClassInfo, fnCode)
+        : await generator.generateForFunction(fn, fnCode);
 
       spinner.succeed('Fix generated!');
 
@@ -142,9 +147,9 @@ export async function fixCommand(options: { interactive?: boolean; verbose?: boo
       const action = await select({
         message: 'What would you like to do?',
         choices: [
-          { name: '[A] Apply this fix', value: 'apply' },
-          { name: '[S] Skip this issue', value: 'skip' },
-          { name: '[Q] Quit session', value: 'quit' },
+          { name: 'Apply this fix', value: 'apply' },
+          { name: 'Skip this issue', value: 'skip' },
+          { name: 'Quit session', value: 'quit' },
         ],
       });
 

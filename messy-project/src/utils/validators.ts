@@ -57,7 +57,7 @@ export function isValidPassword(password: string): boolean {
  * - Empty item arrays are not permitted
  * - The function does not verify if the total matches the sum of item prices
  */
-export function validateOrderInput(input: unknown): { valid: boolean; error?: string } {
+export function validateOrderInput(input: unknown, strictMode: boolean = false): { valid: boolean; error?: string } {
   if (typeof input !== 'object' || input === null) {
     return { valid: false, error: 'Input must be an object' };
   }

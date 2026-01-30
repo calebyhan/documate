@@ -1,12 +1,44 @@
 import { simpleGit, type SimpleGit } from 'simple-git';
+import { relative, isAbsolute } from 'node:path';
 import type { CommitInfo } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 
 export class GitAnalyzer {
   private git: SimpleGit;
+  private repoRootCache: string | null = null;
+  private initPromise: Promise<void> | null = null;
 
   constructor(repoPath: string = process.cwd()) {
+    // Initialize with provided path first, then we'll switch to repo root
     this.git = simpleGit(repoPath);
+  }
+
+  /**
+   * Ensures SimpleGit is initialized with the repository root
+   */
+  private async ensureInitialized(): Promise<void> {
+    if (this.initPromise) {
+      return this.initPromise;
+    }
+
+    this.initPromise = (async () => {
+      const repoRoot = await this.getRepoRoot();
+      this.git = simpleGit(repoRoot);
+    })();
+
+    return this.initPromise;
+  }
+
+  /**
+   * Convert a file path to be relative to the git repository root.
+   * Handles both absolute and relative paths.
+   */
+  private async toRepoRelativePath(filePath: string): Promise<string> {
+    if (!isAbsolute(filePath)) {
+      return filePath;
+    }
+    const repoRoot = await this.getRepoRoot();
+    return relative(repoRoot, filePath);
   }
 
   async isGitRepo(): Promise<boolean> {
@@ -21,8 +53,10 @@ export class GitAnalyzer {
 
   async getFileHistory(filePath: string, limit: number = 10, since?: string): Promise<CommitInfo[]> {
     try {
-      logger.debug(`Getting file history for ${filePath} (limit: ${limit}${since ? `, since: ${since}` : ''})`);
-      const logOptions: any = { file: filePath, maxCount: limit };
+      await this.ensureInitialized();
+      const relPath = await this.toRepoRelativePath(filePath);
+      logger.debug(`Getting file history for ${relPath} (limit: ${limit}${since ? `, since: ${since}` : ''})`);
+      const logOptions: any = { file: relPath, maxCount: limit };
       if (since) {
         logOptions['--since'] = since;
       }
@@ -41,8 +75,10 @@ export class GitAnalyzer {
 
   async getFileDiff(filePath: string, fromCommit: string, toCommit: string): Promise<string> {
     try {
-      logger.debug(`Getting diff for ${filePath} from ${fromCommit} to ${toCommit}`);
-      return await this.git.diff([`${fromCommit}..${toCommit}`, '--', filePath]);
+      await this.ensureInitialized();
+      const relPath = await this.toRepoRelativePath(filePath);
+      logger.debug(`Getting diff for ${relPath} from ${fromCommit} to ${toCommit}`);
+      return await this.git.diff([`${fromCommit}..${toCommit}`, '--', relPath]);
     } catch (err) {
       logger.warn(`Failed to get diff for ${filePath}: ${err instanceof Error ? err.message : String(err)}`);
       return '';
@@ -51,8 +87,10 @@ export class GitAnalyzer {
 
   async getLastModified(filePath: string): Promise<Date> {
     try {
-      logger.debug(`Getting last modified date for ${filePath}`);
-      const log = await this.git.log({ file: filePath, maxCount: 1 });
+      await this.ensureInitialized();
+      const relPath = await this.toRepoRelativePath(filePath);
+      logger.debug(`Getting last modified date for ${relPath}`);
+      const log = await this.git.log({ file: relPath, maxCount: 1 });
       return new Date(log.latest?.date ?? Date.now());
     } catch (err) {
       logger.warn(`Failed to get last modified date for ${filePath}: ${err instanceof Error ? err.message : String(err)}`);
@@ -60,10 +98,27 @@ export class GitAnalyzer {
     }
   }
 
+  async getRepoRoot(): Promise<string> {
+    if (this.repoRootCache) {
+      return this.repoRootCache;
+    }
+    try {
+      const root = await this.git.revparse(['--show-toplevel']);
+      this.repoRootCache = root.trim();
+      return this.repoRootCache;
+    } catch (err) {
+      logger.warn(`Failed to get repo root: ${err instanceof Error ? err.message : String(err)}`);
+      this.repoRootCache = process.cwd();
+      return this.repoRootCache;
+    }
+  }
+
   async getFileAtCommit(filePath: string, commit: string): Promise<string | null> {
     try {
-      logger.debug(`Getting ${filePath} at commit ${commit}`);
-      return await this.git.show([`${commit}:${filePath}`]);
+      await this.ensureInitialized();
+      const relPath = await this.toRepoRelativePath(filePath);
+      logger.debug(`Getting ${relPath} at commit ${commit}`);
+      return await this.git.show([`${commit}:${relPath}`]);
     } catch (err) {
       logger.warn(`Failed to get file at commit ${commit}: ${err instanceof Error ? err.message : String(err)}`);
       return null;
@@ -72,6 +127,7 @@ export class GitAnalyzer {
 
   async getChangedFiles(fromCommit?: string): Promise<string[]> {
     try {
+      await this.ensureInitialized();
       logger.debug(`Getting changed files${fromCommit ? ` from ${fromCommit}` : ''}`);
       if (fromCommit) {
         const diff = await this.git.diff(['--name-only', fromCommit]);

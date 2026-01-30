@@ -1,6 +1,73 @@
 import { hashPassword, verifyPassword } from '../utils/crypto.js';
 import { UserRepository } from '../database/user-repository.js';
 
+/**
+ * Service class for managing user operations including authentication, profile management, and account lifecycle.
+ * Handles password hashing, session token generation, and data persistence through the UserRepository.
+ */
+
+/**
+ * Authenticates a user by verifying their email and password credentials.
+ * If authentication succeeds, generates and returns a new session token.
+ * 
+ * @param email - The email address of the user attempting to authenticate
+ * @param password - The plain text password to verify
+ * @returns A session token string if authentication succeeds, or null if the user is not found or credentials are invalid
+ * 
+ * @example
+ * const token = await userService.authenticateUser('user@example.com', 'mypassword');
+ * if (token) {
+ *   console.log('Authentication successful:', token);
+ * } else {
+ *   console.log('Invalid credentials');
+ * }
+ */
+
+/**
+ * Generates a random session token for a user and persists it to the repository.
+ * This is a private helper method used internally by authentication operations.
+ * 
+ * @param userId - The unique identifier of the user for whom to generate a session token
+ * @returns A randomly generated session token string
+ * 
+ * @private
+ */
+
+/**
+ * Deletes a user account and all associated session data.
+ * Performs a two-step deletion: first removes the user record, then clears all active sessions.
+ * 
+ * @param userId - The unique identifier of the user to delete
+ * @returns True if the user was found and successfully deleted, false if the user does not exist
+ * 
+ * @example
+ * const success = await userService.deleteUser('user-123');
+ * if (success) {
+ *   console.log('User account deleted successfully');
+ * }
+ */
+
+/**
+ * Updates a user's profile information with partial updates.
+ * Validates email uniqueness if the email is being changed and throws errors for invalid operations.
+ * 
+ * @param userId - The unique identifier of the user to update
+ * @param updates - Object containing the fields to update (all fields are optional)
+ * @param updates.name - New display name for the user
+ * @param updates.email - New email address (must be unique across all users)
+ * @param updates.avatar - URL or path to the user's avatar image
+ * @param updates.preferences - Key-value pairs of user preference settings
+ * @returns A promise that resolves when the update is complete
+ * @throws {Error} If the user is not found
+ * @throws {Error} If the new email address is already in use by another user
+ * 
+ * @example
+ * await userService.updateUserProfile('user-123', {
+ *   name: 'John Doe',
+ *   email: 'john.doe@example.com',
+ *   preferences: { theme: 'dark', notifications: true }
+ * });
+ */
 export class UserService {
   private repo: UserRepository;
 
